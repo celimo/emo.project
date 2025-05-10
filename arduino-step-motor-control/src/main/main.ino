@@ -1,6 +1,12 @@
 #include <Arduino.h>
 #include "MotorControl.h"
 
+/*
+PENDING:
+    - Add code for second LEG
+    
+*/
+
 // Pin definitions
 const int buttonPin = 2;
 // Global variables for each motor start position
@@ -16,7 +22,7 @@ MotorControl motorAnkle2(6); // Pin for motor_ankle_2
 
 // State variables
 bool buttonPressed = false;
-enum State { IDLE, MOVE_ANKLE_1, MOVE_HIPS, RETURN_ANKLE_1 };
+enum State { IDLE, MOVE_LEG_1, MOVE_HIPS, RETURN_LEG_1 };
 State currentState = IDLE;
 
 void setup() {
@@ -32,57 +38,82 @@ void setup() {
 
 void loop() {
     // Continuously update all motors
+    updateMotors();
+
+    // Handle button press
+    handleButtonPress();
+
+    // Execute state machine logic
+    handleStateMachine();
+}
+
+// Helper method to update all motors
+void updateMotors() {
     motorAnkle1.update();
     motorHip1.update();
     motorHip2.update();
     motorAnkle2.update();
+}
 
-    // Check if the button is pressed
+// Helper method to handle button press
+void handleButtonPress() {
     if (digitalRead(buttonPin) == LOW && !buttonPressed) {
         buttonPressed = true;
-        currentState = MOVE_ANKLE_1; // Start the sequence
+        currentState = MOVE_LEG_1; // Start the sequence
     }
 
-    // Reset button state when the button is released
     if (digitalRead(buttonPin) == HIGH) {
         buttonPressed = false;
     }
+}
 
-    // State machine to handle motor logic
+// Helper method to handle state machine logic
+void handleStateMachine() {
     switch (currentState) {
         case IDLE:
             // Do nothing, wait for button press
             break;
 
-        case MOVE_ANKLE_1:
-            // Start moving motor_ankle_1 to 180 degrees
-            if (!motorAnkle1.isMovingMotor()) {
-                motorAnkle1.startMotor(180);
-            }
-
-            // Check if motor_ankle_1 has reached 135 degrees
-            if (motorAnkle1.getPosition() >= 135) {
-                motorHip1.startMotor(180); // Move motor_hip_1 to 180 degrees
-                motorHip2.startMotor(0);   // Move motor_hip_2 to 0 degrees
-                currentState = MOVE_HIPS;
-            }
+        case MOVE_LEG_1:
+            handleMoveLeg1();
             break;
 
         case MOVE_HIPS:
-            // Wait until all motors reach their final positions
-            if (!motorAnkle1.isMovingMotor() &&
-                !motorHip1.isMovingMotor() &&
-                !motorHip2.isMovingMotor()) {
-                motorAnkle1.startMotor(startPosMotorAnkle1); // Move motor_ankle_1 back to its start position
-                currentState = RETURN_ANKLE_1;
-            }
+            handleMoveHips();
             break;
 
-        case RETURN_ANKLE_1:
-            // Wait until motor_ankle_1 returns to 90 degrees
-            if (!motorAnkle1.isMovingMotor()) {
-                currentState = IDLE; // Return to idle state
-            }
+        case RETURN_LEG_1:
+            handleReturnAnkle1();
             break;
+    }
+}
+
+// State-specific logic for MOVE_LEG_1
+void handleMoveLeg1() {
+    if (!motorAnkle1.isMovingMotor()) {
+        motorAnkle1.startMotor(180);
+    }
+
+    if (motorAnkle1.getPosition() >= 135) {
+        motorHip1.startMotor(180); // Move motor_hip_1 to 180 degrees
+        motorHip2.startMotor(0);   // Move motor_hip_2 to 0 degrees
+        currentState = MOVE_HIPS;
+    }
+}
+
+// State-specific logic for MOVE_HIPS
+void handleMoveHips() {
+    if (!motorAnkle1.isMovingMotor() &&
+        !motorHip1.isMovingMotor() &&
+        !motorHip2.isMovingMotor()) {
+        motorAnkle1.startMotor(startPosMotorAnkle1); // Move motor_ankle_1 back to its start position
+        currentState = RETURN_LEG_1;
+    }
+}
+
+// State-specific logic for RETURN_LEG_1
+void handleReturnAnkle1() {
+    if (!motorAnkle1.isMovingMotor()) {
+        currentState = IDLE; // Return to idle state
     }
 }
